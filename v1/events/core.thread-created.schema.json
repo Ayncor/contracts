@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.async.local/v1/events/core.thread-created.schema.json",
+  "title": "Core.ThreadCreated",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "event_type",
+    "schema_version",
+    "occurred_at",
+    "org_id",
+    "entity_ref",
+    "payload"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_type": { "const": "Core.ThreadCreated" },
+    "schema_version": { "type": "integer", "const": 1 },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "org_id": { "type": "string", "format": "uuid" },
+    "actor_user_id": { "type": ["string", "null"], "format": "uuid" },
+    "trace_id": { "type": ["string", "null"] },
+    "ordering_key": {
+      "type": ["string", "null"],
+      "description": "Recommended: thread_id"
+    },
+    "entity_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "const": "thread" },
+        "id": { "type": "string", "format": "uuid" }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["thread_id", "channel_id", "title", "state", "created_by"],
+      "properties": {
+        "thread_id": { "type": "string", "format": "uuid" },
+        "channel_id": { "type": "string", "format": "uuid" },
+        "title": { "type": "string" },
+        "purpose": { "type": ["string", "null"] },
+        "state": { "type": "string", "enum": ["OPEN", "BLOCKED", "DECIDED", "ARCHIVED"] },
+        "created_by": { "type": "string", "format": "uuid" },
+        "participant_user_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        }
+      }
+    }
+  }
+}
+

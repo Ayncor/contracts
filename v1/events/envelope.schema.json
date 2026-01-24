@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.async.local/v1/events/envelope.schema.json",
+  "title": "EventEnvelopeV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "event_type",
+    "schema_version",
+    "occurred_at",
+    "org_id",
+    "entity_ref",
+    "payload"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this event (dedupe key)."
+    },
+    "event_type": {
+      "type": "string",
+      "description": "Stable event type string (e.g. Core.MessageCreated)."
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Schema version for this event type within the contract version (v1)."
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the event occurred in the producer's domain timeline."
+    },
+    "org_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Tenant boundary for this event."
+    },
+    "actor_user_id": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "description": "User who caused the change (null for system actions)."
+    },
+    "trace_id": {
+      "type": ["string", "null"],
+      "description": "Optional distributed tracing correlation id."
+    },
+    "ordering_key": {
+      "type": ["string", "null"],
+      "description": "Optional key for per-aggregate ordering (recommended: thread_id for message events)."
+    },
+    "entity_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Entity type string (e.g. thread, message, membership)."
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "description": "Event-type-specific data."
+    }
+  }
+}
+

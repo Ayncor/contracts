@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.async.local/v1/events/identity.role-changed.schema.json",
+  "title": "Identity.RoleChanged",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "event_type",
+    "schema_version",
+    "occurred_at",
+    "org_id",
+    "entity_ref",
+    "payload"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_type": { "const": "Identity.RoleChanged" },
+    "schema_version": { "type": "integer", "const": 1 },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "org_id": { "type": "string", "format": "uuid" },
+    "actor_user_id": { "type": ["string", "null"], "format": "uuid" },
+    "trace_id": { "type": ["string", "null"] },
+    "ordering_key": {
+      "type": ["string", "null"],
+      "description": "Recommended: role_id"
+    },
+    "entity_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "const": "role" },
+        "id": { "type": "string", "format": "uuid" }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role_id", "name", "permissions"],
+      "properties": {
+        "role_id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "permissions": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
+

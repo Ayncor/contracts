@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.async.local/v1/events/identity.membership-changed.schema.json",
+  "title": "Identity.MembershipChanged",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "event_type",
+    "schema_version",
+    "occurred_at",
+    "org_id",
+    "entity_ref",
+    "payload"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_type": { "const": "Identity.MembershipChanged" },
+    "schema_version": { "type": "integer", "const": 1 },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "org_id": { "type": "string", "format": "uuid" },
+    "actor_user_id": { "type": ["string", "null"], "format": "uuid" },
+    "trace_id": { "type": ["string", "null"] },
+    "ordering_key": {
+      "type": ["string", "null"],
+      "description": "Recommended: membership_id"
+    },
+    "entity_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "const": "membership" },
+        "id": { "type": "string", "format": "uuid" }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["membership_id", "user_id", "status"],
+      "properties": {
+        "membership_id": { "type": "string", "format": "uuid" },
+        "user_id": { "type": "string", "format": "uuid" },
+        "role_id": { "type": ["string", "null"], "format": "uuid" },
+        "status": { "type": "string", "enum": ["ACTIVE", "INVITED", "SUSPENDED", "LEFT"] },
+        "joined_at": { "type": ["string", "null"], "format": "date-time" }
+      }
+    }
+  }
+}
+

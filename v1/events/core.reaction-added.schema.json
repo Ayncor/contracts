@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.async.local/v1/events/core.reaction-added.schema.json",
+  "title": "Core.ReactionAdded",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "event_type",
+    "schema_version",
+    "occurred_at",
+    "org_id",
+    "entity_ref",
+    "payload"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_type": { "const": "Core.ReactionAdded" },
+    "schema_version": { "type": "integer", "const": 1 },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "org_id": { "type": "string", "format": "uuid" },
+    "actor_user_id": { "type": ["string", "null"], "format": "uuid" },
+    "trace_id": { "type": ["string", "null"] },
+    "ordering_key": {
+      "type": ["string", "null"],
+      "description": "Recommended: message_id"
+    },
+    "entity_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "const": "reaction" },
+        "id": { "type": "string", "format": "uuid" }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reaction_id", "message_id", "user_id", "emoji"],
+      "properties": {
+        "reaction_id": { "type": "string", "format": "uuid" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "user_id": { "type": "string", "format": "uuid" },
+        "emoji": { "type": "string" }
+      }
+    }
+  }
+}
+

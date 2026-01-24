@@ -1,0 +1,374 @@
+openapi: 3.1.0
+info:
+  title: identity-service API (v1)
+  version: "1.0.0"
+  description: |
+    Authentication, users, organizations, memberships, roles/permissions, audit logs.
+servers:
+  - url: https://identity.example.com
+paths:
+  /auth/login:
+    post:
+      summary: Login (org-scoped)
+      description: |
+        Authenticates a user and returns an **org-scoped** access token (JWT) plus refresh token.
+        v1 requires selecting the org via `org_slug` to avoid ambiguous multi-org sessions.
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+  /auth/refresh:
+    post:
+      summary: Refresh access token (rotate refresh token)
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: Session refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+  /auth/logout:
+    post:
+      summary: Logout (revoke refresh token)
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogoutRequest"
+      responses:
+        "204":
+          description: Logged out
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+  /me:
+    get:
+      summary: Get current user + active membership
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+  /orgs:
+    post:
+      summary: Create organization
+      description: |
+        Creates an organization and adds the caller as an `ORG_ADMIN` member.
+        (Signup flows can be layered on top later.)
+      tags: [Organizations]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrgRequest"
+      responses:
+        "201":
+          description: Organization created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgWithMembership"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+  /orgs/{orgId}:
+    get:
+      summary: Get organization
+      tags: [Organizations]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      responses:
+        "200":
+          description: Organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+  /orgs/{orgId}/members:
+    post:
+      summary: Invite/add member
+      tags: [Memberships]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMemberRequest"
+      responses:
+        "201":
+          description: Membership created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Membership"
+        "403":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+  /orgs/{orgId}/members/{memberId}:
+    patch:
+      summary: Update member (role/status)
+      tags: [Memberships]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+        - $ref: "#/components/parameters/MemberId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMemberRequest"
+      responses:
+        "200":
+          description: Membership updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Membership"
+        "403":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+  /orgs/{orgId}/audit:
+    get:
+      summary: List audit log entries
+      tags: [Audit]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Cursor"
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by action code prefix or exact match.
+      responses:
+        "200":
+          description: Paged audit entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedAuditLog"
+        "403":
+          $ref: "#/components/responses/ErrorResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    OrgId:
+      name: orgId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    MemberId:
+      name: memberId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    PageSize:
+      name: page_size
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+        description: Opaque cursor for pagination.
+  responses:
+    ErrorResponse:
+      description: Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        request_id: { type: string }
+        details: { type: object, additionalProperties: true }
+    LoginRequest:
+      type: object
+      required: [email, password, org_slug]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 1 }
+        org_slug:
+          type: string
+          description: Organization slug to scope the session.
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: { type: string }
+    LogoutRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: { type: string }
+    AuthSession:
+      type: object
+      required: [access_token, refresh_token, user, membership, org]
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        user: { $ref: "#/components/schemas/User" }
+        membership: { $ref: "#/components/schemas/Membership" }
+        org: { $ref: "#/components/schemas/Organization" }
+    MeResponse:
+      type: object
+      required: [user, membership, org]
+      properties:
+        user: { $ref: "#/components/schemas/User" }
+        membership: { $ref: "#/components/schemas/Membership" }
+        org: { $ref: "#/components/schemas/Organization" }
+    CreateOrgRequest:
+      type: object
+      required: [name, slug]
+      properties:
+        name: { type: string, minLength: 3, maxLength: 120 }
+        slug:
+          type: string
+          minLength: 3
+          maxLength: 60
+          pattern: "^[a-z0-9-]+$"
+    OrgWithMembership:
+      type: object
+      required: [org, membership]
+      properties:
+        org: { $ref: "#/components/schemas/Organization" }
+        membership: { $ref: "#/components/schemas/Membership" }
+    CreateMemberRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+        role_id: { type: string, format: uuid, nullable: true }
+    UpdateMemberRequest:
+      type: object
+      properties:
+        role_id: { type: string, format: uuid, nullable: true }
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED, LEFT]
+    Organization:
+      type: object
+      required: [id, name, slug, status, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        status: { type: string, enum: [ACTIVE, SUSPENDED, DELETED] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        deleted_at: { type: string, format: date-time, nullable: true }
+    User:
+      type: object
+      required: [id, email, display_name, status, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        display_name: { type: string }
+        avatar_url: { type: string, nullable: true }
+        status: { type: string, enum: [ACTIVE, SUSPENDED, DELETED] }
+        email_verified_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        deleted_at: { type: string, format: date-time, nullable: true }
+    Membership:
+      type: object
+      required: [id, org_id, user_id, status, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        role_id: { type: string, format: uuid, nullable: true }
+        status: { type: string, enum: [ACTIVE, INVITED, SUSPENDED, LEFT] }
+        joined_at: { type: string, format: date-time, nullable: true }
+        invited_by_user_id: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    AuditLog:
+      type: object
+      required: [id, org_id, action, target_type, metadata_json, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        actor_user_id: { type: string, format: uuid, nullable: true }
+        action: { type: string }
+        target_type: { type: string }
+        target_id: { type: string, format: uuid, nullable: true }
+        metadata_json: { type: object, additionalProperties: true }
+        created_at: { type: string, format: date-time }
+    PagedAuditLog:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AuditLog" }
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page (null if end).
