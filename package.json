@@ -1,8 +1,16 @@
 {
   "name": "@ayncor/contracts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AynCor contracts (OpenAPI, event schemas, realtime protocol).",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ayncor/contracts.git"
+  },
+  "homepage": "https://github.com/Ayncor/contracts#readme",
+  "bugs": {
+    "url": "https://github.com/Ayncor/contracts/issues"
+  },
   "type": "commonjs",
   "main": "./index.js",
   "types": "./index.d.ts",
@@ -12,5 +20,8 @@
     "v1/**",
     "README.md"
   ],
-  "publishConfig": { "access": "restricted" }
+  "publishConfig": {
+    "access": "restricted",
+    "registry": "https://npm.pkg.github.com"
+  }
 }
