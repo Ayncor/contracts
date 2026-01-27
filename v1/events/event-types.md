@@ -17,6 +17,10 @@ This is the canonical list of event types and their intended consumers.
   - **Used by**: digest generation, search indexing, analytics
 - **`Core.ThreadStateChanged`**
   - **Used by**: digest generation (“decision made”), analytics, AI summarization triggers
+- **`Core.ThreadParticipantAdded`**
+  - **Used by**: notification routing (who to notify), search indexing, audit views
+- **`Core.ThreadUserStateChanged`**
+  - **Used by**: inbox sync, digest eligibility, audit views
 - **`Core.MessageCreated`**
   - **Used by**: digest generation, urgent routing, AI summarization, search indexing
 - **`Core.MessageVersionCreated`**
