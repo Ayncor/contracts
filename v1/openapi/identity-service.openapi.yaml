@@ -193,6 +193,82 @@ paths:
           $ref: "#/components/responses/ErrorResponse"
         "404":
           $ref: "#/components/responses/ErrorResponse"
+  /orgs/{orgId}/roles:
+    get:
+      summary: List roles for org
+      description: Any org member can list. Returns system roles (ORG_ADMIN, ORG_MEMBER) and custom roles. Used for role dropdown when adding members/invites.
+      tags: [Roles]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      responses:
+        "200":
+          description: Roles
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RolesListResponse" }
+        "403":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+    post:
+      summary: Create custom role (org admin only)
+      description: System role names (ORG_ADMIN, ORG_MEMBER) are reserved and rejected.
+      tags: [Roles]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateRoleRequest" }
+      responses:
+        "201":
+          description: Role created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoleResponse" }
+        "403":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+        "409":
+          description: Role name reserved (ORG_ADMIN, ORG_MEMBER) or already exists
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /orgs/{orgId}/roles/{roleId}:
+    patch:
+      summary: Update custom role (org admin only)
+      description: System roles cannot be updated. Name and/or permissions.
+      tags: [Roles]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+        - $ref: "#/components/parameters/RoleId"
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateRoleRequest" }
+      responses:
+        "200":
+          description: Role updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoleResponse" }
+        "403":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+        "409":
+          description: Role name reserved or already exists
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /orgs/{orgId}/members:
     post:
       summary: Invite/add member
@@ -404,6 +480,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    RoleId:
+      name: roleId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     PageSize:
       name: page_size
       in: query
@@ -525,6 +606,40 @@ components:
         status:
           type: string
           enum: [ACTIVE, SUSPENDED, LEFT]
+    Role:
+      type: object
+      required: [id, org_id, name, permissions, is_system, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        name: { type: string }
+        permissions: { type: array, items: { type: string } }
+        is_system: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    CreateRoleRequest:
+      type: object
+      required: [name, permissions]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        permissions: { type: array, items: { type: string } }
+    UpdateRoleRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        permissions: { type: array, items: { type: string } }
+    RoleResponse:
+      type: object
+      required: [role]
+      properties:
+        role: { $ref: "#/components/schemas/Role" }
+    RolesListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Role" }
     Organization:
       type: object
       required: [id, name, slug, status, created_at, updated_at]

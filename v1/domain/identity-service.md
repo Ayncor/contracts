@@ -110,6 +110,12 @@ This service owns **authentication**, **users**, **organizations**, **membership
 - `channels:manage`
 - `threads:moderate` (state transitions / archival policies)
 
+**API**
+
+- `GET /orgs/:orgId/roles` — list roles (any org member). Used for role dropdown when adding members/invites.
+- `POST /orgs/:orgId/roles` — create custom role (org admin only). Body: `name`, `permissions`. Names `ORG_ADMIN`, `ORG_MEMBER` are reserved.
+- `PATCH /orgs/:orgId/roles/:roleId` — update custom role (org admin only). System roles cannot be updated.
+
 ---
 
 ### RefreshToken
@@ -188,6 +194,7 @@ This service owns **authentication**, **users**, **organizations**, **membership
 - **Rate limiting**: login 5/60s, refresh 30/60s, password-reset/request 5/60s, invites/accept 5/60s.
 - **Me**: `GET /me` (Bearer) — user, org, membership.
 - **Orgs**: `POST /orgs`, `GET /orgs/:orgId` (Bearer).
+- **Roles**: `GET /orgs/:orgId/roles` (list; any org member), `POST /orgs/:orgId/roles` (create custom role; org admin), `PATCH /orgs/:orgId/roles/:roleId` (update custom role; org admin; system roles are read-only).
 - **Members**: `POST /orgs/:orgId/members`, `PATCH /orgs/:orgId/members/:memberId` (Bearer).
 - **Invites**: `POST /orgs/:orgId/invites`, `GET /orgs/:orgId/invites`, `POST /orgs/:orgId/invites/revoke` (Bearer). Public: `POST /orgs/:orgId/invites/verify`, `POST /orgs/:orgId/invites/accept`, `POST /orgs/:orgId/invites/decline`.
 - **Audit**: `GET /orgs/:orgId/audit` (Bearer). Query: `page_size` (default 50, max 200), `cursor` (opaque), `action` (filter by action prefix).
