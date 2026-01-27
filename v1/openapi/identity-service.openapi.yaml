@@ -3,16 +3,44 @@ info:
   title: identity-service API (v1)
   version: "1.0.0"
   description: |
-    Authentication, users, organizations, memberships, roles/permissions, audit logs.
+    Authentication, users, organizations, memberships, invites, roles/permissions, audit logs, health.
+    **JWT claims** (access token): `sub` (user_id), `org_id`, `membership_id`, `role_id` (optional), `perms` (string[]), `jti` (optional).
+    **Rate limiting**: `/auth/login` 5/60s, `/auth/refresh` 30/60s, `/auth/password-reset/request` 5/60s, `/orgs/{orgId}/invites/accept` 5/60s.
 servers:
   - url: https://identity.example.com
 paths:
+  /health:
+    get:
+      summary: Liveness check
+      tags: [Health]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthLive" }
+  /health/ready:
+    get:
+      summary: Readiness check (DB connectivity)
+      tags: [Health]
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthReady" }
+        "503":
+          description: Not ready
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthReady" }
   /auth/login:
     post:
       summary: Login (org-scoped)
       description: |
         Authenticates a user and returns an **org-scoped** access token (JWT) plus refresh token.
         v1 requires selecting the org via `org_slug` to avoid ambiguous multi-org sessions.
+        **Rate limited:** 5 requests per 60 seconds.
       tags: [Auth]
       requestBody:
         required: true
@@ -32,6 +60,7 @@ paths:
   /auth/refresh:
     post:
       summary: Refresh access token (rotate refresh token)
+      description: **Rate limited:** 30 requests per 60 seconds. Implements refresh token rotation + reuse detection.
       tags: [Auth]
       requestBody:
         required: true
@@ -61,6 +90,47 @@ paths:
       responses:
         "204":
           description: Logged out
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+  /auth/logout-all:
+    post:
+      summary: Revoke all refresh tokens for current user in current org
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: All tokens revoked
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+  /auth/password-reset/request:
+    post:
+      summary: Request password reset (placeholder)
+      description: Always returns 202 to avoid user enumeration. **Rate limited:** 5/60s.
+      tags: [Auth]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordResetRequest" }
+      responses:
+        "202":
+          description: Accepted
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+  /auth/password-reset/confirm:
+    post:
+      summary: Confirm password reset (placeholder)
+      description: Returns 501 Not Implemented.
+      tags: [Auth]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordResetConfirm" }
+      responses:
+        "200":
+          description: Reset complete (when implemented)
+        "501":
+          description: Not implemented
         "401":
           $ref: "#/components/responses/ErrorResponse"
   /me:
@@ -174,6 +244,124 @@ paths:
           $ref: "#/components/responses/ErrorResponse"
         "404":
           $ref: "#/components/responses/ErrorResponse"
+  /orgs/{orgId}/invites:
+    post:
+      summary: Create invite (org admin only)
+      tags: [Invites]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateInviteRequest" }
+      responses:
+        "201":
+          description: Invite created; token returned once (deliver out-of-band)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreateInviteResponse" }
+        "403":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+    get:
+      summary: List invites for org (org admin only)
+      tags: [Invites]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      responses:
+        "200":
+          description: Invites
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitesListResponse" }
+        "403":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+  /orgs/{orgId}/invites/revoke:
+    post:
+      summary: Revoke an invite (org admin only)
+      tags: [Invites]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RevokeInviteRequest" }
+      responses:
+        "204":
+          description: Invite revoked
+        "403":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+  /orgs/{orgId}/invites/verify:
+    post:
+      summary: Verify invite token (public, no auth)
+      description: Returns org + invite details; does not leak token hash.
+      tags: [Invites]
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerifyInviteRequest" }
+      responses:
+        "200":
+          description: Invite valid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VerifyInviteResponse" }
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+  /orgs/{orgId}/invites/accept:
+    post:
+      summary: Accept invite (public)
+      description: Creates user if needed or validates password; returns access + refresh tokens. **Rate limited:** 5/60s.
+      tags: [Invites]
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AcceptInviteRequest" }
+      responses:
+        "200":
+          description: Session created (same shape as /auth/login)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthSession" }
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+  /orgs/{orgId}/invites/decline:
+    post:
+      summary: Decline invite (public, no auth)
+      tags: [Invites]
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DeclineInviteRequest" }
+      responses:
+        "204":
+          description: Invite declined
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
   /orgs/{orgId}/audit:
     get:
       summary: List audit log entries
@@ -229,9 +417,8 @@ components:
       name: cursor
       in: query
       required: false
-      schema:
-        type: string
-        description: Opaque cursor for pagination.
+      schema: { type: string }
+      description: Opaque cursor for pagination (audit uses numeric offset; null if end).
   responses:
     ErrorResponse:
       description: Error
@@ -267,6 +454,32 @@ components:
       required: [refresh_token]
       properties:
         refresh_token: { type: string }
+    PasswordResetRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+        org_slug: { type: string, pattern: "^[a-z0-9-]+$" }
+    PasswordResetConfirm:
+      type: object
+      required: [token, new_password]
+      properties:
+        token: { type: string }
+        new_password: { type: string, minLength: 8 }
+    HealthLive:
+      type: object
+      required: [status, ts]
+      properties:
+        status: { type: string, enum: [ok] }
+        ts: { type: string, format: date-time }
+    HealthReady:
+      type: object
+      required: [status, ts]
+      properties:
+        status: { type: string, enum: [ok, error] }
+        db: { type: string, enum: [ok, down], nullable: true }
+        latency_ms: { type: integer, nullable: true }
+        ts: { type: string, format: date-time }
     AuthSession:
       type: object
       required: [access_token, refresh_token, user, membership, org]
@@ -372,3 +585,70 @@ components:
           type: string
           nullable: true
           description: Opaque cursor for the next page (null if end).
+    CreateInviteRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+        role_id: { type: string, format: uuid, nullable: true }
+    CreateInviteResponse:
+      type: object
+      required: [invite, token]
+      properties:
+        invite: { $ref: "#/components/schemas/Invite" }
+        token: { type: string, description: "One-time token; deliver out-of-band." }
+    Invite:
+      type: object
+      required: [id, org_id, email, created_at, expires_at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role_id: { type: string, format: uuid, nullable: true }
+        invited_by_user_id: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        accepted_at: { type: string, format: date-time, nullable: true }
+        declined_at: { type: string, format: date-time, nullable: true }
+        revoked_at: { type: string, format: date-time, nullable: true }
+    InvitesListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Invite" }
+    RevokeInviteRequest:
+      type: object
+      required: [invite_id]
+      properties:
+        invite_id: { type: string, format: uuid }
+    VerifyInviteRequest:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string }
+    VerifyInviteResponse:
+      type: object
+      required: [org, invite]
+      properties:
+        org:
+          type: object
+          required: [id, name, slug]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            slug: { type: string }
+        invite: { $ref: "#/components/schemas/Invite" }
+    AcceptInviteRequest:
+      type: object
+      required: [token, password]
+      properties:
+        token: { type: string }
+        password: { type: string, minLength: 8 }
+        display_name: { type: string, minLength: 1, maxLength: 120 }
+    DeclineInviteRequest:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string }

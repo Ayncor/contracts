@@ -1,6 +1,6 @@
 {
   "name": "@ayncor/contracts",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "AynCor contracts (OpenAPI, event schemas, realtime protocol).",
   "license": "UNLICENSED",
   "repository": {

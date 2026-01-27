@@ -1,6 +1,6 @@
 ## identity-service (v1) domain model
 
-This service owns **authentication**, **users**, **organizations**, **memberships**, **roles/permissions**, and **audit logs**.
+This service owns **authentication**, **users**, **organizations**, **memberships**, **invites**, **roles/permissions**, **audit logs**, and **health**.
 
 ### Global invariants
 
@@ -167,8 +167,9 @@ This service owns **authentication**, **users**, **organizations**, **membership
 - **Claims (v1)**:
   - `sub`: `user_id`
   - `org_id`: active organization context
-  - `member_id`: membership id in that org (optional but useful)
-  - `roles` or `perms`: either role names or flattened permissions (prefer flattened `perms` to keep runtime checks simple)
+  - `membership_id`: membership id in that org (required in implementation)
+  - `role_id`: optional
+  - `perms`: flattened permission codes (string[]) — preferred over role names for runtime checks
   - `iat`, `exp`
   - `jti` (token id; optional for audit correlation)
 
@@ -176,4 +177,18 @@ This service owns **authentication**, **users**, **organizations**, **membership
 
 - Opaque string; only hashed value stored.
 - Scoped to (`user_id`, `org_id`) to avoid ambiguous multi-org refresh semantics.
+- **Rotation**: one-time use; reuse detection revokes all refresh tokens for that user/org.
+
+---
+
+## API surface (summary)
+
+- **Health**: `GET /health` (liveness), `GET /health/ready` (readiness with DB check). No auth.
+- **Auth**: `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/logout-all` (Bearer). Placeholders: `POST /auth/password-reset/request` (202), `POST /auth/password-reset/confirm` (501).
+- **Rate limiting**: login 5/60s, refresh 30/60s, password-reset/request 5/60s, invites/accept 5/60s.
+- **Me**: `GET /me` (Bearer) — user, org, membership.
+- **Orgs**: `POST /orgs`, `GET /orgs/:orgId` (Bearer).
+- **Members**: `POST /orgs/:orgId/members`, `PATCH /orgs/:orgId/members/:memberId` (Bearer).
+- **Invites**: `POST /orgs/:orgId/invites`, `GET /orgs/:orgId/invites`, `POST /orgs/:orgId/invites/revoke` (Bearer). Public: `POST /orgs/:orgId/invites/verify`, `POST /orgs/:orgId/invites/accept`, `POST /orgs/:orgId/invites/decline`.
+- **Audit**: `GET /orgs/:orgId/audit` (Bearer). Query: `page_size` (default 50, max 200), `cursor` (opaque), `action` (filter by action prefix).
 
