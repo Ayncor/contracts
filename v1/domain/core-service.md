@@ -4,7 +4,7 @@ This service owns **channels**, **threads**, **messages**, **reactions**, **part
 
 ### API and org scoping
 
-The API uses **JWT-based org scoping**: there is no `orgId` path parameter. The validated JWT supplies `org_id`, `user_id`, and optionally `membership_id`. All endpoints (except health) require `Authorization: Bearer <access_token>`. Paths are unscoped by org in the URL, e.g. `GET /channels`, `GET /inbox`, `GET /threads/channel/:channelId`, `GET /threads/:threadId/user-state`. See OpenAPI spec for the full surface.
+The API uses **JWT-based org scoping**: there is no `orgId` path parameter. The validated JWT supplies `org_id`, `user_id` (`sub`), and optionally `membership_id`. All endpoints (except health) require `Authorization: Bearer <access_token>`. The same JWT is issued by identity-service and validated by core-service using the same `JWT_ACCESS_SECRET`. **realtime-gateway** also validates that JWT for WebSocket connections (same secret). Paths are unscoped by org in the URL, e.g. `GET /channels`, `GET /inbox`, `GET /threads/channel/:channelId`, `GET /threads/:threadId/user-state`. See OpenAPI spec for the full surface.
 
 ### Global invariants
 
@@ -32,6 +32,7 @@ The API uses **JWT-based org scoping**: there is no `orgId` path parameter. The 
 - `org_id` (uuid, required)
 - `name` (string, required, 2..120)
 - `slug` (string, required, 2..60, pattern `[a-z0-9-]+`) — unique per org, used in URLs
+- `description` (string, nullable, 0..500) — optional short description
 - `visibility` (enum: `ORG` | `PRIVATE`, required)
 - `created_by` (uuid, required) — user id
 - `created_at` (timestamp, required)
@@ -220,10 +221,11 @@ To prevent “latest reply wins”, the system provides an explicit per-user thr
 
 - `thread_id`, `thread_title`, `thread_purpose`, `thread_state`, `thread_last_activity_at`
 - `user_status`, `needs_response`, `has_urgent_unread`, `unread_count`, `latest_message_preview`
+- `unread_count` uses the user's `last_read_message_id` when set: count of messages in the thread with `createdAt` after that message; otherwise total message count in the thread.
 - `next_action` (enum: `REVIEW` | `RESPOND` | `WAIT` | `NONE`)
 - `priority_override`, `sort_key` (opaque, for stable ordering)
 
-Query params: `limit` (default 50, max 100), `cursor` (for future cursor-based paging). Ordering: `priority_override` (HIGH before NONE/LOW), `needs_response` desc, `last_activity_at` desc. The ordering is **not** “latest message time desc”.
+Query params: `limit` (default 50, max 100), `cursor` (opaque token from previous response's `next_cursor` for the next page). Response includes `items` and optionally `next_cursor` when more results exist. Ordering: `priority_override` (HIGH before NONE/LOW), `needs_response` desc, `last_activity_at` desc. The ordering is **not** “latest message time desc”.
 
 ---
 

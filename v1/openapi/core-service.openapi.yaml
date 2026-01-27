@@ -223,6 +223,7 @@ paths:
         Returns server-ordered inbox items for the current user. Org and user come from JWT.
         Only threads with user_state.status = IN_INBOX are included.
         Ordering: priority_override (HIGH before NONE/LOW), needs_response, last_activity_at desc.
+        unread_count uses the user's last_read_message_id when set: count of messages in the thread with createdAt after that message; otherwise total message count in the thread.
       tags: [Inbox]
       security:
         - bearerAuth: []
@@ -235,10 +236,10 @@ paths:
           in: query
           required: false
           schema: { type: string }
-          description: Opaque cursor for pagination (future).
+          description: Opaque cursor from previous response next_cursor to fetch the next page.
       responses:
         "200":
-          description: Inbox items
+          description: Inbox items and optional next_cursor when more results exist.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/InboxResponse" }
@@ -419,6 +420,7 @@ components:
         name: { type: string, minLength: 2, maxLength: 120 }
         slug: { type: string, minLength: 2, maxLength: 60, pattern: "^[a-z0-9-]+$" }
         visibility: { $ref: "#/components/schemas/ChannelVisibility" }
+        description: { type: string, nullable: true, maxLength: 500 }
     Channel:
       type: object
       required: [id, org_id, name, slug, visibility, created_at]
@@ -427,6 +429,7 @@ components:
         org_id: { type: string, format: uuid }
         name: { type: string }
         slug: { type: string }
+        description: { type: string, nullable: true }
         visibility: { $ref: "#/components/schemas/ChannelVisibility" }
         created_at: { type: string, format: date-time }
     ChannelResponse:
@@ -580,8 +583,8 @@ components:
         thread_last_activity_at: { type: string, format: date-time }
         user_status: { $ref: "#/components/schemas/ThreadUserStatus" }
         needs_response: { type: boolean }
-        has_urgent_unread: { type: boolean }
-        unread_count: { type: integer, minimum: 0 }
+        has_urgent_unread: { type: boolean, description: True when thread has URGENT messages and unread_count > 0. }
+        unread_count: { type: integer, minimum: 0, description: When user_state.last_read_message_id is set, count of messages in thread with createdAt after that message; otherwise total messages in thread. }
         latest_message_preview: { type: string, nullable: true }
         next_action: { $ref: "#/components/schemas/InboxNextAction" }
         priority_override: { $ref: "#/components/schemas/PriorityOverride" }
@@ -593,6 +596,10 @@ components:
         items:
           type: array
           items: { $ref: "#/components/schemas/InboxItem" }
+        next_cursor:
+          type: string
+          nullable: true
+          description: Present when more results exist; pass as cursor on the next request.
 
     MessageKind:
       type: string

@@ -13,7 +13,12 @@ This directory defines **versioned, implementation-independent contracts** for t
 - `domain/`: entity definitions and invariants (fields, constraints, lifecycle rules)
 - `openapi/`: HTTP APIs (OpenAPI 3.1) for `identity-service` and `core-service`
 - `events/`: event envelope + event type schemas (for outbox/event bus)
-- `realtime/`: realtime-gateway protocol boundaries (stateless fan-out only)
+- `realtime/`: realtime-gateway protocol (WebSocket auth, subscribe/unsubscribe, event fan-out)
+
+## Service integration (v1)
+
+- **identity-service** issues JWTs (access + refresh) and is the sole auth authority.
+- **core-service** and **realtime-gateway** validate the same access token using the same `JWT_ACCESS_SECRET`; neither calls identity-service per request. Realtime-gateway uses the JWT for WebSocket connection auth and org-scoped subscriptions.
 
 ## Versioning rules
 

@@ -6,6 +6,7 @@ info:
     Authentication, users, organizations, memberships, invites, roles/permissions, audit logs, health.
     **JWT claims** (access token): `sub` (user_id), `org_id`, `membership_id`, `role_id` (optional), `perms` (string[]), `jti` (optional).
     **Rate limiting**: `/auth/login` 5/60s, `/auth/refresh` 30/60s, `/auth/password-reset/request` 5/60s, `/orgs/{orgId}/invites/accept` 5/60s.
+    **Refresh token metadata**: Login and refresh store device/IP context on each refresh token (`user_agent`, `ip_at_issue` at issue; `last_used_at`, `last_used_from_ip` on use). `GET /me/sessions` lists active sessions; `DELETE /me/sessions/:sessionId` revokes one session.
 servers:
   - url: https://identity.example.com
 paths:
@@ -41,6 +42,7 @@ paths:
         Authenticates a user and returns an **org-scoped** access token (JWT) plus refresh token.
         v1 requires selecting the org via `org_slug` to avoid ambiguous multi-org sessions.
         **Rate limited:** 5 requests per 60 seconds.
+        Refresh tokens store device context: `user_agent` and `ip_at_issue` are captured from the request and stored on the new token.
       tags: [Auth]
       requestBody:
         required: true
@@ -60,7 +62,9 @@ paths:
   /auth/refresh:
     post:
       summary: Refresh access token (rotate refresh token)
-      description: **Rate limited:** 30 requests per 60 seconds. Implements refresh token rotation + reuse detection.
+      description: |
+        **Rate limited:** 30 requests per 60 seconds. Implements refresh token rotation + reuse detection.
+        The previous token's `last_used_at` and `last_used_from_ip` are updated; the new token stores `user_agent` and `ip_at_issue` from the request.
       tags: [Auth]
       requestBody:
         required: true
@@ -147,6 +151,40 @@ paths:
               schema:
                 $ref: "#/components/schemas/MeResponse"
         "401":
+          $ref: "#/components/responses/ErrorResponse"
+  /me/sessions:
+    get:
+      summary: List active sessions (devices) for current user in current org
+      description: Returns non-revoked, non-expired refresh tokens with device/IP metadata for "Your devices" UI. No token value is returned.
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Active sessions
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionsListResponse" }
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+  /me/sessions/{sessionId}:
+    delete:
+      summary: Revoke a session (device) by id
+      description: Revokes the refresh token for that session. Caller must own the session (user/org from JWT). Returns 204 on success, 404 if session not found or already revoked.
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Session revoked
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
           $ref: "#/components/responses/ErrorResponse"
   /orgs:
     post:
@@ -577,6 +615,25 @@ components:
         user: { $ref: "#/components/schemas/User" }
         membership: { $ref: "#/components/schemas/Membership" }
         org: { $ref: "#/components/schemas/Organization" }
+    Session:
+      type: object
+      required: [id, created_at, expires_at]
+      description: Active session (device) — refresh token metadata only; no token value.
+      properties:
+        id: { type: string, format: uuid }
+        user_agent: { type: string, nullable: true }
+        ip_at_issue: { type: string, nullable: true }
+        last_used_at: { type: string, format: date-time, nullable: true }
+        last_used_from_ip: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+    SessionsListResponse:
+      type: object
+      required: [sessions]
+      properties:
+        sessions:
+          type: array
+          items: { $ref: "#/components/schemas/Session" }
     CreateOrgRequest:
       type: object
       required: [name, slug]

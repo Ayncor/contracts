@@ -26,9 +26,12 @@ The realtime-gateway provides **stateless event fan-out** over WebSocket.
 
 ## Authentication
 
-- Client sends a short-lived JWT (same as HTTP) during connection establishment.
-- Gateway validates JWT signature/expiry and extracts `org_id` and `user_id`.
-- Gateway does **not** call identity-service synchronously per message; it remains stateless aside from connection session.
+- Client sends a short-lived JWT (same as HTTP/identity-service) during connection establishment.
+- Gateway validates JWT signature/expiry using the **same secret** as identity-service (`JWT_ACCESS_SECRET`) and extracts `org_id` and `sub` (user_id). It does **not** call identity-service per message.
+- **How to send the token (v1)**:
+  - **Query param**: `?access_token=<jwt>` on the WebSocket URL (e.g. `ws://host/path?access_token=...`).
+  - **First message**: if the client connects without a query token, it may send a single message `{ "type": "auth", "request_id": "<string>", "payload": { "access_token": "<jwt>" } }`. The gateway validates it and then accepts `subscribe` / `unsubscribe`; there is no separate ack frame for `auth`.
+- **On auth failure**: gateway sends `{ "type": "error", "request_id": null, "payload": { "code": "auth_failed", "message": "Invalid or expired token" } }` and may close the connection with code `4003` and reason `auth_failed`.
 
 ---
 
@@ -44,6 +47,8 @@ All frames are JSON objects with:
 
 Supported `type` values (v1):
 
+- `auth` (optional first message when token is not in query)
+  - `payload`: `{ "access_token": "<jwt>" }`
 - `subscribe`
   - `payload`:
     - `org_id` (uuid, required; must match JWT claim)
@@ -66,7 +71,7 @@ Supported `type` values (v1):
     - `envelope` (EventEnvelopeV1)
 - `error`
   - `payload`:
-    - `code` (string)
+    - `code` (string) — e.g. `auth_failed`, `auth_required`, `invalid_message`, `invalid_payload`, `forbidden`, `unknown_type`
     - `message` (string)
 
 ---

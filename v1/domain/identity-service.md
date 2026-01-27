@@ -130,12 +130,12 @@ This service owns **authentication**, **users**, **organizations**, **membership
 - `token_hash` (string, required) — store only a salted hash
 - `expires_at` (timestamp, required)
 - `created_at` (timestamp, required)
-- `rotated_at` (timestamp, nullable)
 - `revoked_at` (timestamp, nullable)
-- `revoked_reason` (string, nullable)
-- `device_label` (string, nullable) — “MacBook”, “Chrome on Windows”, etc.
-- `ip_first_seen` (string, nullable)
-- `ip_last_seen` (string, nullable)
+- `replaced_by_id` (uuid, nullable) — id of the token that replaced this one (rotation)
+- `user_agent` (string, nullable) — User-Agent header at issue (device/browser context)
+- `ip_at_issue` (string, nullable) — client IP when the token was created
+- `last_used_at` (timestamp, nullable) — when the token was last used (e.g. on refresh)
+- `last_used_from_ip` (string, nullable) — client IP at last use
 
 **Constraints**
 
@@ -185,17 +185,22 @@ This service owns **authentication**, **users**, **organizations**, **membership
 - Scoped to (`user_id`, `org_id`) to avoid ambiguous multi-org refresh semantics.
 - **Rotation**: one-time use; reuse detection revokes all refresh tokens for that user/org.
 
+### JWT consumers (same secret)
+
+- **core-service** and **realtime-gateway** validate the same access token using the same `JWT_ACCESS_SECRET`. No separate token issuance; identity-service is the sole issuer.
+
 ---
 
 ## API surface (summary)
 
 - **Health**: `GET /health` (liveness), `GET /health/ready` (readiness with DB check). No auth.
 - **Auth**: `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/logout-all` (Bearer). Placeholders: `POST /auth/password-reset/request` (202), `POST /auth/password-reset/confirm` (501).
+- **Sessions (devices)**: `GET /me/sessions` (Bearer) — list active refresh tokens (device/IP metadata) for "Your devices" UI. `DELETE /me/sessions/:sessionId` (Bearer) — revoke that session by id (404 if not found or already revoked).
 - **Rate limiting**: login 5/60s, refresh 30/60s, password-reset/request 5/60s, invites/accept 5/60s.
 - **Me**: `GET /me` (Bearer) — user, org, membership.
 - **Orgs**: `POST /orgs`, `GET /orgs/:orgId` (Bearer).
 - **Roles**: `GET /orgs/:orgId/roles` (list; any org member), `POST /orgs/:orgId/roles` (create custom role; org admin), `PATCH /orgs/:orgId/roles/:roleId` (update custom role; org admin; system roles are read-only).
 - **Members**: `POST /orgs/:orgId/members`, `PATCH /orgs/:orgId/members/:memberId` (Bearer).
 - **Invites**: `POST /orgs/:orgId/invites`, `GET /orgs/:orgId/invites`, `POST /orgs/:orgId/invites/revoke` (Bearer). Public: `POST /orgs/:orgId/invites/verify`, `POST /orgs/:orgId/invites/accept`, `POST /orgs/:orgId/invites/decline`.
-- **Audit**: `GET /orgs/:orgId/audit` (Bearer). Query: `page_size` (default 50, max 200), `cursor` (opaque), `action` (filter by action prefix).
+- **Audit**: `GET /orgs/:orgId/audit` (Bearer). Query: `page_size` (default 50, max 200), `cursor` (opaque), `action` (filter by action prefix). Response: `items`, `next_cursor` (opaque; null when no more pages).
 
