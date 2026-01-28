@@ -87,7 +87,7 @@ The API uses **JWT-based org scoping**: there is no `orgId` path parameter. The 
 
 **Constraints**
 
-- Unique `(org_id, thread_id, user_id)` for participants with `left_at IS NULL`.
+- Unique `(org_id, thread_id, user_id)` per thread; `left_at` marks a participant as inactive/left (re-joining reactivates the same row).
 
 **API**
 
@@ -124,7 +124,7 @@ The API uses **JWT-based org scoping**: there is no `orgId` path parameter. The 
 **Constraints**
 
 - Append-only for `Message` rows; edits do not update `Message`.
-- `kind=SYSTEM` messages must be authored by `author_id` representing a system user/service principal (implementation detail) but are still auditable.
+- `kind=SYSTEM` messages are system-generated events (e.g. "participant joined"). `author_id` may be set to the user who triggered the action (e.g. who added the participant) or null for system-initiated events; they are still auditable.
 
 **API (messages)**
 
