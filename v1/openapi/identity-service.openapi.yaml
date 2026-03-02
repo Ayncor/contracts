@@ -5,7 +5,7 @@ info:
   description: |
     Authentication, users, organizations, memberships, invites, roles/permissions, audit logs, health.
     **JWT claims** (access token): `sub` (user_id), `org_id`, `membership_id`, `role_id` (optional), `perms` (string[]), `jti` (optional).
-    **Rate limiting**: `/auth/login` 5/60s, `/auth/refresh` 30/60s, `/auth/password-reset/request` 5/60s, `/orgs/{orgId}/invites/accept` 5/60s.
+    **Rate limiting**: `/auth/login` 5/60s, `/auth/refresh` 30/60s, `/orgs/signup` 5/60s, `/auth/password-reset/request` 5/60s, `/orgs/{orgId}/invites/accept` 5/60s.
     **Refresh token metadata**: Login and refresh store device/IP context on each refresh token (`user_agent`, `ip_at_issue` at issue; `last_used_at`, `last_used_from_ip` on use). `GET /me/sessions` lists active sessions; `DELETE /me/sessions/:sessionId` revokes one session.
 servers:
   - url: https://identity.example.com
@@ -186,12 +186,56 @@ paths:
           $ref: "#/components/responses/ErrorResponse"
         "404":
           $ref: "#/components/responses/ErrorResponse"
+  /orgs/availability/slug:
+    get:
+      summary: Check if team URL (slug) is available
+      description: Public. Use for sign-up form validation. Returns false for reserved slugs (www, app, api, etc.) and taken slugs.
+      tags: [Organizations]
+      parameters:
+        - name: slug
+          in: query
+          required: true
+          schema: { type: string, pattern: "^[a-z0-9-]+$" }
+      responses:
+        "200":
+          description: Availability check
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [available]
+                properties:
+                  available: { type: boolean }
+  /orgs/signup:
+    post:
+      summary: Sign up (create user + org)
+      description: |
+        Creates a new user and organization in one transaction. Caller becomes ORG_ADMIN.
+        Optionally invite team members; invite tokens returned in `invites_created`.
+        **Rate limited:** 5 requests per 60 seconds.
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SignupRequest" }
+      responses:
+        "200":
+          description: Session created (same shape as /auth/login; may include invites_created)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthSession" }
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "409":
+          description: Email or org slug already taken
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /orgs:
     post:
       summary: Create organization
-      description: |
-        Creates an organization and adds the caller as an `ORG_ADMIN` member.
-        (Signup flows can be layered on top later.)
+      description: Creates an organization and adds the caller as an `ORG_ADMIN` member. Requires existing auth.
       tags: [Organizations]
       security:
         - bearerAuth: []
@@ -211,6 +255,46 @@ paths:
         "400":
           $ref: "#/components/responses/ErrorResponse"
         "401":
+          $ref: "#/components/responses/ErrorResponse"
+  /orgs/{orgId}/settings:
+    get:
+      summary: Get org settings (org admin only)
+      description: Returns allowed_email_domains and require_company_email. When domains are set, only those domains can be invited/added.
+      tags: [Organizations]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      responses:
+        "200":
+          description: Org settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrgSettingsResponse" }
+        "403":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+    patch:
+      summary: Update org settings (org admin only)
+      tags: [Organizations]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateOrgSettingsRequest" }
+      responses:
+        "200":
+          description: Settings updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrgSettingsResponse" }
+        "403":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
           $ref: "#/components/responses/ErrorResponse"
   /orgs/{orgId}:
     get:
@@ -554,6 +638,25 @@ components:
         message: { type: string }
         request_id: { type: string }
         details: { type: object, additionalProperties: true }
+    SignupInvite:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+        role_id: { type: string, format: uuid, nullable: true }
+    SignupRequest:
+      type: object
+      required: [email, password, display_name, org_name, org_slug]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        display_name: { type: string, minLength: 1, maxLength: 120 }
+        org_name: { type: string, minLength: 3, maxLength: 120 }
+        org_slug: { type: string, minLength: 3, maxLength: 60, pattern: "^[a-z0-9-]+$" }
+        invites:
+          type: array
+          items: { $ref: "#/components/schemas/SignupInvite" }
+          description: Optional team invites; tokens returned in invites_created.
     LoginRequest:
       type: object
       required: [email, password, org_slug]
@@ -634,6 +737,17 @@ components:
         sessions:
           type: array
           items: { $ref: "#/components/schemas/Session" }
+    OrgSettingsResponse:
+      type: object
+      required: [allowed_email_domains, require_company_email]
+      properties:
+        allowed_email_domains: { type: array, items: { type: string } }
+        require_company_email: { type: boolean }
+    UpdateOrgSettingsRequest:
+      type: object
+      properties:
+        allowed_email_domains: { type: array, items: { type: string } }
+        require_company_email: { type: boolean }
     CreateOrgRequest:
       type: object
       required: [name, slug]
