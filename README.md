@@ -7,7 +7,7 @@ Versioned, implementation-independent contracts for the Ayncor platform.
 ## What lives here
 
 - `v1/openapi/`: OpenAPI 3.1 specs for HTTP APIs
-  - `identity-service.openapi.yaml` — Auth, users, orgs, members, invites, roles, audit, health
+  - `identity-service.openapi.yaml` — Auth (login, refresh, signup), users, orgs, members, invites, roles, audit, health
   - `core-service.openapi.yaml` — Channels, threads, messages, reactions, participants, inbox, user-state
 - `v1/events/`: JSON Schemas for event envelopes + event payloads
 - `v1/realtime/`: protocol docs for the stateless realtime-gateway (WebSocket)

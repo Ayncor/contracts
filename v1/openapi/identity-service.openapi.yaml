@@ -711,6 +711,15 @@ components:
         user: { $ref: "#/components/schemas/User" }
         membership: { $ref: "#/components/schemas/Membership" }
         org: { $ref: "#/components/schemas/Organization" }
+        invites_created:
+          type: array
+          items:
+            type: object
+            required: [email, token]
+            properties:
+              email: { type: string, format: email }
+              token: { type: string, description: "One-time invite token; deliver out-of-band." }
+          description: Present when signup included invites; tokens returned once.
     MeResponse:
       type: object
       required: [user, membership, org]
