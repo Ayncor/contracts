@@ -19,8 +19,8 @@ The realtime-gateway provides **stateless event fan-out** over WebSocket.
 
 - WebSocket events are **not** authoritative.
 - Clients must treat them as **hints** and reconcile via HTTP APIs using:
-  - `GET /orgs/:orgId/inbox` (server ordering)
-  - `GET /orgs/:orgId/threads/:threadId` and message list endpoints (added later)
+  - `GET /inbox` (server ordering)
+  - `GET /messages/thread/:threadId` and related thread endpoints
 
 ---
 
@@ -99,7 +99,7 @@ Gateway must not emit:
 When receiving an `event`:
 
 - If topic is `inbox`:
-  - client should schedule a refresh of `GET /orgs/:orgId/inbox` (debounced, not per-event).
+  - client should schedule a refresh of `GET /inbox` (debounced, not per-event).
 - If topic is `thread`:
   - client should refresh thread metadata and new messages via HTTP (endpoints added/extended later).
 

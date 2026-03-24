@@ -6,10 +6,42 @@ info:
     Channels, threads, messages, reactions, participants, user-state, inbox, and thread lifecycle.
     **Org scoping**: All resources are scoped by organization. The service uses **JWT-based org scoping**:
     `org_id` (and `user_id`) are taken from the validated JWT; there is no `orgId` path parameter.
-    Clients send `Authorization: Bearer <access_token>`; the token must contain `org_id` and `user_id` (and optionally `membership_id`).
+    Clients send `Authorization: Bearer <access_token>`; the token must contain `org_id`, `user_id`, and `membership_id`.
 servers:
   - url: https://core.example.com
 paths:
+  /health:
+    get:
+      summary: Liveness check
+      tags: [Health]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthLive" }
+  /health/ready:
+    get:
+      summary: Readiness check (DB connectivity)
+      tags: [Health]
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthReady" }
+        "503":
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [statusCode, message]
+                properties:
+                  statusCode: { type: integer, example: 503 }
+                  message: { $ref: "#/components/schemas/HealthReady" }
+                  error: { type: string, example: "Service Unavailable" }
+
   /channels:
     post:
       summary: Create channel
@@ -317,7 +349,7 @@ paths:
         - $ref: "#/components/parameters/MessageId"
       responses:
         "200":
-          description: Versions (oldest first)
+          description: Versions (newest first)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MessageVersionsListResponse" }
@@ -354,7 +386,7 @@ paths:
         - $ref: "#/components/parameters/MessageId"
       responses:
         "200":
-          description: Reactions (including removed, with removed_at when applicable)
+          description: Reactions grouped by emoji with count and whether current user reacted
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ReactionsListResponse" }
@@ -415,11 +447,14 @@ components:
       enum: [ORG, PRIVATE]
     CreateChannelRequest:
       type: object
-      required: [name, slug, visibility]
+      required: [name, slug]
       properties:
         name: { type: string, minLength: 2, maxLength: 120 }
         slug: { type: string, minLength: 2, maxLength: 60, pattern: "^[a-z0-9-]+$" }
-        visibility: { $ref: "#/components/schemas/ChannelVisibility" }
+        visibility:
+          allOf:
+            - $ref: "#/components/schemas/ChannelVisibility"
+          default: ORG
         description: { type: string, nullable: true, maxLength: 500 }
     Channel:
       type: object
@@ -453,8 +488,8 @@ components:
       required: [channel_id, title]
       properties:
         channel_id: { type: string, format: uuid }
-        title: { type: string, minLength: 1, maxLength: 140 }
-        purpose: { type: string, nullable: true, maxLength: 1000 }
+        title: { type: string, minLength: 2, maxLength: 200 }
+        purpose: { type: string, nullable: true, maxLength: 2000 }
     Thread:
       type: object
       required: [id, org_id, channel_id, title, state, created_at, last_activity_at]
@@ -739,18 +774,32 @@ components:
             emoji: { type: string }
             created_at: { type: string, format: date-time }
             removed_at: { type: string, format: date-time, nullable: true }
+    ReactionsListItem:
+      type: object
+      required: [emoji, count, me]
+      properties:
+        emoji: { type: string }
+        count: { type: integer, minimum: 0 }
+        me: { type: boolean }
     ReactionsListResponse:
       type: object
       required: [reactions]
       properties:
         reactions:
           type: array
-          items:
-            type: object
-            properties:
-              id: { type: string, format: uuid }
-              org_id: { type: string, format: uuid }
-              message_id: { type: string, format: uuid }
-              emoji: { type: string }
-              created_at: { type: string, format: date-time }
-              removed_at: { type: string, format: date-time, nullable: true }
+          items: { $ref: "#/components/schemas/ReactionsListItem" }
+
+    HealthLive:
+      type: object
+      required: [status, ts]
+      properties:
+        status: { type: string, enum: [ok] }
+        ts: { type: string, format: date-time }
+    HealthReady:
+      type: object
+      required: [status, ts]
+      properties:
+        status: { type: string, enum: [ok, error] }
+        db: { type: string, enum: [ok, down], nullable: true }
+        latency_ms: { type: integer, nullable: true }
+        ts: { type: string, format: date-time }
