@@ -303,18 +303,32 @@ paths:
         "404": { $ref: "#/components/responses/ErrorResponse" }
   /messages/thread/{threadId}:
     get:
-      summary: List messages in thread
+      summary: List messages in thread (cursor pagination)
+      description: |
+        Returns messages with latest version per message, **newest first** (by `created_at`, then `id`).
+        Use `limit` (default 50, max 200) and optional `cursor` from the previous response's `next_cursor` to load older messages (infinite scroll).
+        Cursor is opaque (base64url); do not parse client-side. Cursors are scoped to the thread and org.
       tags: [Messages]
       security:
         - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/ThreadId"
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+          description: Opaque `next_cursor` from the previous page to fetch older messages.
       responses:
         "200":
-          description: Messages with latest version
+          description: Page of messages; `next_cursor` present when more older messages exist.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MessagesListResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
         "403": { $ref: "#/components/responses/ErrorResponse" }
         "404": { $ref: "#/components/responses/ErrorResponse" }
   /messages/{messageId}/versions:
@@ -713,6 +727,7 @@ components:
       properties:
         messages:
           type: array
+          description: Newest message first within this page.
           items:
             type: object
             properties:
@@ -726,6 +741,9 @@ components:
               requires_response: { type: boolean }
               created_at: { type: string, format: date-time }
               latest_version: { $ref: "#/components/schemas/MessageVersion" }
+        next_cursor:
+          type: string
+          description: Pass as `cursor` on the next request to load older messages. Omitted when this is the last page.
     CreateMessageVersionRequest:
       type: object
       required: [body]
